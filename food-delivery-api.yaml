@@ -1,0 +1,792 @@
+openapi: 3.0.3
+info:
+  title: Food Delivery Service API
+  version: 1.0.0
+  description: API для сервиса доставки еды с функционалом меню, оформления заказов, оплаты и отслеживания доставки
+  contact:
+    name: API Support
+    email: support@fooddelivery.com
+
+servers:
+  - url: https://api.fooddelivery.com/v1
+
+paths:
+  /restaurants:
+    get:
+      tags:
+        - Restaurants
+      summary: Получить список ресторанов
+      description: Возвращает список доступных ресторанов с фильтрацией по местоположению
+      parameters:
+        - name: latitude
+          in: query
+          description: Широта местоположения пользователя
+          required: true
+          schema:
+            type: number
+            format: float
+        - name: longitude
+          in: query
+          description: Долгота местоположения пользователя
+          required: true
+          schema:
+            type: number
+            format: float
+        - name: radius
+          in: query
+          description: Радиус поиска в километрах
+          schema:
+            type: integer
+            default: 5
+        - name: cuisine
+          in: query
+          description: Тип кухни для фильтрации
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Успешный возврат списка ресторанов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restaurants:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Restaurant"
+        "400":
+          description: Неверные параметры запроса
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /restaurants/{restaurantId}/menu:
+    get:
+      tags:
+        - Restaurants
+      summary: Получить меню ресторана
+      description: Возвращает полное меню указанного ресторана
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          description: ID ресторана
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Успешный возврат меню ресторана
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restaurant:
+                    $ref: "#/components/schemas/Restaurant"
+                  categories:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MenuCategory"
+        "404":
+          description: Ресторан не найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /orders:
+    post:
+      tags:
+        - Orders
+      summary: Создать новый заказ
+      description: Создание нового заказа доставки еды
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        "201":
+          description: Заказ успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Неверные данные заказа
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: Ошибка валидации данных заказа
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  /orders/{orderId}:
+    get:
+      tags:
+        - Orders
+      summary: Получить информацию о заказе
+      description: Возвращает детальную информацию о заказе
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          description: ID заказа
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Успешный возврат информации о заказе
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "404":
+          description: Заказ не найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /orders/{orderId}/payment:
+    post:
+      tags:
+        - Payment
+      summary: Оплатить заказ
+      description: Выполнение оплаты для указанного заказа
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          description: ID заказа
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentRequest"
+      responses:
+        "200":
+          description: Оплата прошла успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "402":
+          description: Ошибка оплаты
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /orders/{orderId}/tracking:
+    get:
+      tags:
+        - Tracking
+      summary: Отслеживание доставки
+      description: Возвращает текущий статус доставки и местоположение курьера
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          description: ID заказа
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Успешный возврат информации о доставке
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliveryTracking"
+        "404":
+          description: Заказ не найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /orders/{orderId}/rating:
+    post:
+      tags:
+        - Ratings
+      summary: Оценить заказ
+      description: Добавление оценок для ресторана, блюд и курьера
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          description: ID заказа
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RatingRequest"
+      responses:
+        "201":
+          description: Оценки успешно добавлены
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Ratings submitted successfully"
+        "404":
+          description: Заказ не найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /orders/{orderId}/courier/contact:
+    get:
+      tags:
+        - Courier
+      summary: Связаться с курьером
+      description: Получить контактную информацию курьера для связи
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          description: ID заказа
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Контактная информация курьера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourierContact"
+        "404":
+          description: Заказ или курьер не найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /orders/{orderId}/repeat:
+    post:
+      tags:
+        - Orders
+      summary: Повторить заказ
+      description: Создание нового заказа на основе предыдущего
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          description: ID заказа для повторения
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: Новый заказ создан на основе предыдущего
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "404":
+          description: Исходный заказ не найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    Restaurant:
+      type: object
+      required:
+        - id
+        - name
+        - address
+        - cuisine
+        - rating
+        - is_open
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Уникальный идентификатор ресторана
+        name:
+          type: string
+          description: Название ресторана
+          maxLength: 100
+        address:
+          type: string
+          description: Адрес ресторана
+          maxLength: 200
+        cuisine:
+          type: string
+          description: Тип кухни
+          enum: [ITALIAN, CHINESE, JAPANESE, MEXICAN, AMERICAN, INDIAN, RUSSIAN]
+        rating:
+          type: number
+          format: float
+          minimum: 1
+          maximum: 5
+          description: Рейтинг ресторана
+        delivery_time:
+          type: integer
+          description: Среднее время доставки в минутах
+        min_order_amount:
+          type: number
+          format: float
+          description: Минимальная сумма заказа
+        is_open:
+          type: boolean
+          description: Открыт ли ресторан для заказов
+        image_url:
+          type: string
+          format: uri
+          description: URL изображения ресторана
+
+    Dish:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - price
+        - category
+        - is_available
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Уникальный идентификатор блюда
+        name:
+          type: string
+          description: Название блюда
+          maxLength: 100
+        description:
+          type: string
+          description: Описание блюда
+          maxLength: 500
+        price:
+          type: number
+          format: float
+          minimum: 0
+          description: Цена блюда
+        category:
+          type: string
+          description: Категория блюда
+          maxLength: 50
+        is_available:
+          type: boolean
+          description: Доступно ли блюдо для заказа
+        image_url:
+          type: string
+          format: uri
+          description: URL изображения блюда
+        calories:
+          type: integer
+          description: Калорийность блюда
+        allergens:
+          type: array
+          items:
+            type: string
+          description: Список аллергенов
+
+    Order:
+      type: object
+      required:
+        - id
+        - user_id
+        - restaurant_id
+        - status
+        - total_amount
+        - created_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Уникальный идентификатор заказа
+        user_id:
+          type: integer
+          format: int64
+          description: ID пользователя
+        restaurant_id:
+          type: integer
+          format: int64
+          description: ID ресторана
+        status:
+          type: string
+          enum:
+            [
+              PENDING,
+              CONFIRMED,
+              PREPARING,
+              READY,
+              IN_DELIVERY,
+              DELIVERED,
+              CANCELLED,
+            ]
+          description: Статус заказа
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+          description: Список позиций в заказе
+        total_amount:
+          type: number
+          format: float
+          minimum: 0
+          description: Общая сумма заказа
+        delivery_address:
+          type: string
+          description: Адрес доставки
+        delivery_instructions:
+          type: string
+          description: Дополнительные инструкции для доставки
+        estimated_delivery_time:
+          type: string
+          format: date-time
+          description: Расчетное время доставки
+        created_at:
+          type: string
+          format: date-time
+          description: Время создания заказа
+        updated_at:
+          type: string
+          format: date-time
+          description: Время последнего обновления заказа
+
+    Courier:
+      type: object
+      required:
+        - id
+        - name
+        - phone
+        - vehicle_type
+        - is_available
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Уникальный идентификатор курьера
+        name:
+          type: string
+          description: Имя курьера
+          maxLength: 100
+        phone:
+          type: string
+          description: Телефон курьера
+          pattern: '^\+7\d{10}$'
+        vehicle_type:
+          type: string
+          enum: [CAR, BICYCLE, SCOOTER, WALKING]
+          description: Тип транспортного средства
+        rating:
+          type: number
+          format: float
+          minimum: 1
+          maximum: 5
+          description: Рейтинг курьера
+        is_available:
+          type: boolean
+          description: Доступен ли курьер для заказов
+        current_location:
+          $ref: "#/components/schemas/Location"
+
+    OrderItem:
+      type: object
+      required:
+        - dish_id
+        - quantity
+        - price
+      properties:
+        dish_id:
+          type: integer
+          format: int64
+          description: ID блюда
+        dish_name:
+          type: string
+          description: Название блюда
+        quantity:
+          type: integer
+          minimum: 1
+          description: Количество
+        price:
+          type: number
+          format: float
+          minimum: 0
+          description: Цена за единицу
+        special_instructions:
+          type: string
+          description: Особые пожелания к блюду
+
+    MenuCategory:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+          description: Название категории
+        dishes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Dish"
+          description: Блюда в категории
+
+    CreateOrderRequest:
+      type: object
+      required:
+        - restaurant_id
+        - items
+        - delivery_address
+      properties:
+        restaurant_id:
+          type: integer
+          format: int64
+          description: ID ресторана
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItemRequest"
+          minItems: 1
+          description: Позиции заказа
+        delivery_address:
+          type: string
+          description: Адрес доставки
+          maxLength: 200
+        delivery_instructions:
+          type: string
+          description: Инструкции для доставки
+          maxLength: 500
+        payment_method:
+          type: string
+          enum: [CARD, CASH, ONLINE]
+          default: "CARD"
+
+    OrderItemRequest:
+      type: object
+      required:
+        - dish_id
+        - quantity
+      properties:
+        dish_id:
+          type: integer
+          format: int64
+          description: ID блюда
+        quantity:
+          type: integer
+          minimum: 1
+          description: Количество
+        special_instructions:
+          type: string
+          description: Особые пожелания
+
+    PaymentRequest:
+      type: object
+      required:
+        - payment_method
+      properties:
+        payment_method:
+          type: string
+          enum: [CARD, CASH, ONLINE]
+          description: Способ оплаты
+        card_token:
+          type: string
+          description: Токен карты (для онлайн оплаты)
+        save_card:
+          type: boolean
+          description: Сохранить карту для будущих платежей
+          default: false
+
+    PaymentResponse:
+      type: object
+      required:
+        - success
+        - transaction_id
+      properties:
+        success:
+          type: boolean
+          description: Успешность оплаты
+        transaction_id:
+          type: string
+          description: ID транзакции
+        payment_status:
+          type: string
+          enum: [SUCCESS, PENDING, FAILED]
+        message:
+          type: string
+          description: Сообщение о статусе оплаты
+
+    DeliveryTracking:
+      type: object
+      required:
+        - order_id
+        - status
+      properties:
+        order_id:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+            [
+              PENDING,
+              CONFIRMED,
+              PREPARING,
+              READY,
+              IN_DELIVERY,
+              DELIVERED,
+              CANCELLED,
+            ]
+        courier:
+          $ref: "#/components/schemas/Courier"
+        estimated_delivery_time:
+          type: string
+          format: date-time
+          description: Расчетное время доставки
+        current_location:
+          $ref: "#/components/schemas/Location"
+        distance_remaining:
+          type: number
+          format: float
+          description: Оставшееся расстояние в км
+
+    RatingRequest:
+      type: object
+      required:
+        - restaurant_rating
+      properties:
+        restaurant_rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Оценка ресторана
+        restaurant_comment:
+          type: string
+          description: Комментарий к ресторану
+        dish_ratings:
+          type: array
+          items:
+            $ref: "#/components/schemas/DishRating"
+          description: Оценки блюд
+        courier_rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Оценка курьера
+        courier_comment:
+          type: string
+          description: Комментарий к курьеру
+
+    DishRating:
+      type: object
+      required:
+        - dish_id
+        - rating
+      properties:
+        dish_id:
+          type: integer
+          format: int64
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+
+    CourierContact:
+      type: object
+      required:
+        - name
+        - phone
+      properties:
+        name:
+          type: string
+          description: Имя курьера
+        phone:
+          type: string
+          description: Телефон курьера
+        vehicle_type:
+          type: string
+          description: Тип транспортного средства
+
+    Location:
+      type: object
+      required:
+        - latitude
+        - longitude
+      properties:
+        latitude:
+          type: number
+          format: float
+        longitude:
+          type: number
+          format: float
+        timestamp:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Код ошибки
+        message:
+          type: string
+          description: Сообщение об ошибке
+        details:
+          type: string
+          description: Детали ошибки
+
+    ValidationError:
+      type: object
+      required:
+        - code
+        - message
+        - violations
+      properties:
+        code:
+          type: string
+          default: "VALIDATION_ERROR"
+        message:
+          type: string
+          default: "Validation failed"
+        violations:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: Поле с ошибкой
+              message:
+                type: string
+                description: Сообщение об ошибке валидации
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []
